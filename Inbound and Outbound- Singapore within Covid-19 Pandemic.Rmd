@@ -1,0 +1,107 @@
+---
+title: "Inbound and Outbound: Singapore within Covid-19 Pandemic"
+author: "Ricky Rahardja"
+date: "7/12/2020"
+output: pdf_document
+---
+
+
+## Introduction
+This report is to show the number of people move in and out from Singapore since the Covid-19 pandemic breakout in December 2019, through the lockdown months and up to the 2nd phase of re-opening in June 2020.
+Data is taken from the number of application made for move-in and move-out from private properties, that is done by 1 moving service company.
+
+The objective case this report provide leads to the number of move-in and out in Singapore case as a whole. When this 1 company has market share of, for example 10%, this report could be used as the sample size and indicate the approximation of move-in and move-out number during the Covid-19 pandemic.
+
+```{r}
+#install and run library tidyverse
+install.packages("tidyverse")
+library(tidyverse)
+
+#load data file and save to data_sheet1 and data_sheet2
+library(readxl)
+
+data_sheet1 <- read_excel("~/Desktop/R Project/ProjectMove/ProjectMove.xlsx", sheet = "2019")
+data_sheet2 <- read_excel("~/Desktop/R Project/ProjectMove/ProjectMove.xlsx", sheet = "2020")
+View(data_sheet1)
+View(data_sheet2)
+
+#select variable and bind rows from 2 data sheets, save into main_data
+main_data <- rbind(data_sheet1[, c("job_type", "job_date")], data_sheet2[, c("job_type", "job_date")])
+
+View(main_data)
+head(main_data)
+glimpse(main_data)
+table(main_data$job_type)
+
+#create read-able data table (sanitize data)
+#clean service category data
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(tidyr)
+
+main_data_cleaned <- main_data %>% 
+  mutate(job_date = date(job_date), year = year(job_date), month = month(job_date, label = TRUE)) %>%
+  mutate(job_type = str_to_lower(job_type)) %>%
+  mutate(job_type = str_replace_all(job_type, c("disposal" = "move-out export", 
+                                                "local/ storage" = "move-out export",
+                                                "move-in local" = "local move",
+                                                "move-out local" = "local move", 
+                                                "move-in import" = "inbound",
+                                                "move-out export" = "outbound")))
+
+View(main_data_cleaned)
+head(main_data_cleaned)
+glimpse(main_data_cleaned)
+
+#sanity check
+unique(main_data_cleaned$year)
+unique(main_data_cleaned$month)
+table(main_data_cleaned$year)
+table(main_data_cleaned$month)
+
+#create granular data table (taming and tidying)
+main_data_ready <- main_data_cleaned %>%
+  unite(month, year, col = "service_month", sep = "-") %>%
+  mutate(service_month = factor(service_month, levels = c("Sep-2019",
+                                                          "Oct-2019", 
+                                                          "Nov-2019", 
+                                                          "Dec-2019", 
+                                                          "Jan-2020", 
+                                                          "Feb-2020", 
+                                                          "Mar-2020", 
+                                                          "Apr-2020",
+                                                          "May-2020", 
+                                                          "Jun-2020",
+                                                          "Jul-2020",
+                                                          "Aug-2020", 
+                                                          "Sep-2020"), order = T)) %>%
+  mutate(local_move_job = ifelse(job_type == "local move", 1, 0), 
+         inbound_job = ifelse(job_type == "inbound", 1, 0), 
+         outbound_job = ifelse(job_type == "outbound", 1, 0))
+
+View(main_data_ready)
+
+#create summary data
+plot_data <- main_data_ready %>% 
+            filter(job_date >= "2019-12-01" & job_date <= "2020-06-30") %>%
+            group_by(service_month) %>%
+            summarise(inbound_job = sum(inbound_job), 
+            outbound_job = sum(outbound_job), 
+            total = sum(inbound_job + outbound_job))
+
+plot_data
+
+#create visualization
+library(ggplot2)
+
+plot_data %>% 
+  gather("inbound_job", "outbound_job", key = "jobs", value = "total") %>%
+  ggplot(aes(service_month, total, fill = jobs)) +
+  geom_col()
+```
+
+
+#Conclusion
+It appears that over the Covid-19 pandemic, Total of  number of moving into and moving out from Singapore has declined gradually to 50% normally. Moving into Singapore declined substantially until it hits the lowest in May and maintained in June 2020. Moving out from Singapore has declined since January and gradually decreasing until May 2020 and it quickly increases when 2nd phase of re-opening in June 2020. 
+
